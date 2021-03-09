@@ -49,7 +49,7 @@ def get_accuracy(pred_labels, true_labels):
 def get_data(data_name):
     if data_name == 'SYNTH':
         return sklearn.datasets.make_blobs(n_samples=1000, n_features=2000, centers=5, cluster_std=600, center_box=(-1000,1000), shuffle=True)
-    elif data_name =='ORL':
+    elif data_name == 'ORL':
         data_set = sklearn.datasets.fetch_olivetti_faces(shuffle=True)
         return data_set.data, data_set.target
     else:
@@ -57,7 +57,7 @@ def get_data(data_name):
 
 def run(args):
     ### Data producer
-    ds_features, targets = get_data('SYNTH')
+    ds_features, targets = get_data(args.data_set)
 
     kmeans_alg = KMeans(n_clusters=len(np.unique(targets)), n_init=5, max_iter=500)
 
@@ -80,8 +80,8 @@ def produce_fit(kmeans_alg, features, trans_name: str, r: int, use_reduction: bo
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-k', type=int, default=40)
-    parser.add_argument('-use-reduction', type=bool, default=False)
-    parser.add_argument('-r', type=int, default=20)
+    parser.add_argument('--data-set', type=str, default='SYNTH')
+    parser.add_argument('-use-reduction', type=bool, default=True)
+    # parser.add_argument('-r', type=int, default=20)
     parsed_args = parser.parse_args()
     run(parsed_args)
