@@ -40,30 +40,48 @@ def get_dim_reduction_transformer(trans_name, r) -> sklearn.base.TransformerMixi
     return trans_dict[trans_name]
 
 
+def get_accuracy(pred_labels, true_labels):
+    num_pred_mistakes = 0
+    for lbl in np.unique(pred_labels):
+        num_pred_mistakes += np.sum(np.bincount(true_labels[pred_labels == lbl])) - np.max(np.bincount(true_labels[pred_labels == lbl]))
+    return 1 - num_pred_mistakes / true_labels.size
+
+def get_data(data_name):
+    if data_name == 'SYNTH':
+        return sklearn.datasets.make_blobs(n_samples=1000, n_features=2000, centers=5, cluster_std=600, center_box=(-1000,1000), shuffle=True)
+    elif data_name =='ORL':
+        data_set = sklearn.datasets.fetch_olivetti_faces(shuffle=True)
+        return data_set.data, data_set.target
+    else:
+        return None
 
 def run(args):
     ### Data producer
-    X = sklearn.datasets.fetch_olivetti_faces().data #ORL #TODO raplece with get dataset function
+    ds_features, targets = get_data('SYNTH')
 
-    for args.r in range(5,105,5):
-        ### dim reduction
-        if args.use_reduction:
-            transformer = get_dim_reduction_transformer("SVD", args.r)
-            X_red = transformer.fit_transform(X)
-            # print(X_red.shape)
-        else:
-            X_red = X
+    kmeans_alg = KMeans(n_clusters=len(np.unique(targets)), n_init=5, max_iter=500)
 
-        ### K-means
-        # retreive 1. centroids, 2. labels -> calc relattive objective func F/\norm(A)_F^2
-        kmeans_alg = KMeans(n_clusters=args.k, n_init=5, max_iter=500)
-        kmeans_res = kmeans_alg.fit_predict(X_red)
-        print(args.r, sum_squared_norm_from_centroids(X, kmeans_res))
+    for r in range(5, 105, 5):
+        labels = produce_fit(kmeans_alg, ds_features, 'Random Projections', r, args.use_reduction)
+        print(r, sum_squared_norm_from_centroids(ds_features, labels),
+              sklearn.metrics.homogeneity_score(targets, labels), get_accuracy(labels, targets))
+
+
+def produce_fit(kmeans_alg, features, trans_name: str, r: int, use_reduction: bool):
+    # dim reduction
+    if use_reduction:
+        transformer = get_dim_reduction_transformer(trans_name, r)
+        features_transformed = transformer.fit_transform(features)
+    else:
+        features_transformed = features
+
+    # K-means
+    return kmeans_alg.fit_predict(features_transformed)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-k', type=int, default=40)
-    parser.add_argument('-use-reduction', type=bool, default=True)
+    # parser.add_argument('-k', type=int, default=40)
+    parser.add_argument('-use-reduction', type=bool, default=False)
     parser.add_argument('-r', type=int, default=20)
     parsed_args = parser.parse_args()
     run(parsed_args)
