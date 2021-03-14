@@ -1,11 +1,12 @@
 import argparse
 import sklearn
+import sklearn.pipeline
 import sklearn.datasets
 from sklearn.random_projection import GaussianRandomProjection
 from sklearn.cluster import KMeans
 import numpy as np
 import pandas as pd
-from time import clock
+from time import perf_counter
 
 
 def sum_squared_norm_from_centroids(data_points, labels):
@@ -19,7 +20,7 @@ def sum_squared_norm_from_centroids(data_points, labels):
     return sum_squared / (np.linalg.norm(data_points) ** 2)
 
 
-def get_dim_reduction_transformer(trans_name, r) -> sklearn.base.TransformerMixin:
+def get_dim_reduction_transformer(trans_name, r, n_features_z_matrix: int = 0, eps=1/3) -> sklearn.base.TransformerMixin:
     """
     1. Randomized Sampling with Exact SVD (Sampl/SVD). This corresponds to Algorithm 1 with the following modification.
     In the first step of the algorithm, the matrix Z is calculated to contain exactly the
@@ -34,15 +35,58 @@ def get_dim_reduction_transformer(trans_name, r) -> sklearn.base.TransformerMixi
     6. Laplacian Scores (LapScores).
     """
     trans_dict = {
-        "Randomized Sampling with Exact SVD": None,
-        "Randomized Sampling with Approximate SVD": None,
+        "Randomized Sampling with Exact SVD":
+            sklearn.preprocessing.FunctionTransformer(rand_sampling_with_exact_svd,
+                                                      kw_args={"r": r,
+                                                               "n_features_z_matrix": n_features_z_matrix}),
+        "Randomized Sampling with Approximate SVD":
+            sklearn.preprocessing.FunctionTransformer(rand_sampling_with_exact_svd,
+                                                      kw_args={"r": r,
+                                                               "n_features_z_matrix": n_features_z_matrix,
+                                                               'approx_svd': True,
+                                                               'eps': 1/3}),
         "Random Projections": GaussianRandomProjection(r),
         "SVD": sklearn.decomposition.TruncatedSVD(r),
-        "Approximate SVD": None,
-        "Laplacian Scores": None,
+        "Approximate SVD": sklearn.preprocessing.FunctionTransformer(approximate_svd, kw_args={"k": r, "eps": eps}),
+        # "Laplacian Scores": None,
         "K-Means": sklearn.preprocessing.FunctionTransformer()  # identity transformer
     }
     return trans_dict[trans_name]
+
+
+def rand_sampling_with_exact_svd(mat: np.ndarray, n_features_z_matrix, r, approx_svd=False, eps=0):
+    if approx_svd:
+        z_mat = fast_forbenius_svd(mat, n_features_z_matrix, eps)
+    else:
+        z_mat = get_right_svd_decomposion_truncated(mat, n_features_z_matrix)
+    columns_ind_sampled, scaling_factors = randomize_sampling(z_mat, r)
+    return mat[:, columns_ind_sampled] * scaling_factors
+
+
+def get_right_svd_decomposion_truncated(mat: np.ndarray, k):
+    # TODO this function is not optimized and have redundant calculations
+    u, s, vh = np.linalg.svd(mat, compute_uv=True, full_matrices=False)
+    return np.transpose(vh[:k])
+
+
+def fast_forbenius_svd(mat: np.ndarray, k: int, eps):
+    y_mat = GaussianRandomProjection(k + int(k / eps) + 1).fit_transform(mat)
+    q_mat, _ = np.linalg.qr(y_mat)
+    return get_right_svd_decomposion_truncated(np.matmul(np.transpose(q_mat), mat), k)
+
+
+def approximate_svd(mat: np.ndarray, k: int, eps):
+    return np.matmul(mat, fast_forbenius_svd(mat, k, eps))
+
+
+def randomize_sampling(mat: np.ndarray, r) -> np.ndarray:
+    # Calculation of the p_i (TODO latex)
+    probabilities = np.linalg.norm(mat, axis=0) ** 2 / (np.linalg.norm(mat) ** 2)
+    # Sampling columns indexes according to the p_i's
+    columns_ind_sampled = np.random.choice(probabilities.size, r, p=probabilities)
+    # Rescaling columns by 1/√(r * p_i)
+    return columns_ind_sampled, np.sqrt(r * probabilities[columns_ind_sampled])
+    # return mat[:, columns_ind_sampled] / np.sqrt(r * probabilities[columns_ind_sampled])
 
 
 def get_accuracy(pred_labels, true_labels):
@@ -70,9 +114,12 @@ def run(args):
 
     kmeans_alg = KMeans(n_clusters=len(np.unique(targets)), n_init=5, max_iter=500)
     row_list = list()
-    for trans_name in ['Random Projections', 'SVD', 'K-Means']:
+    for trans_name in ['Randomized Sampling with Exact SVD',
+                       'Randomized Sampling with Approximate SVD',
+                       'Random Projections', 'SVD', 'Approximate SVD', 'K-Means']:
+        print(trans_name)
         for r in range(5, 105, 5):
-            labels, running_time = produce_fit(kmeans_alg, ds_features, trans_name, r)
+            labels, running_time = produce_fit(kmeans_alg, ds_features, trans_name, r, len(np.unique(targets)))
             row_list.append([trans_name, r, sum_squared_norm_from_centroids(ds_features, labels),
                              get_accuracy(labels, targets), running_time])
 
@@ -93,14 +140,14 @@ def plot_df(data_set_name: str, df: pd.DataFrame):
         plt.show()
 
 
-def produce_fit(kmeans_alg, features, trans_name: str, r: int):
+def produce_fit(kmeans_alg, features, trans_name: str, r: int, n_features_z_matrix: int):
     # dim reduction
-    transformer = get_dim_reduction_transformer(trans_name, r)
-    start_time = clock()
+    transformer = get_dim_reduction_transformer(trans_name, r, n_features_z_matrix)
+    start_time = perf_counter()
     features_transformed = transformer.fit_transform(features)
 
     # K-means
-    return kmeans_alg.fit_predict(features_transformed), clock() - start_time
+    return kmeans_alg.fit_predict(features_transformed), perf_counter() - start_time
 
 
 if __name__ == '__main__':
