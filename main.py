@@ -7,6 +7,7 @@ from sklearn.cluster import KMeans
 import numpy as np
 import pandas as pd
 from time import perf_counter
+from typing import Tuple
 
 
 def sum_squared_norm_from_centroids(data_points, labels):
@@ -20,7 +21,8 @@ def sum_squared_norm_from_centroids(data_points, labels):
     return sum_squared / (np.linalg.norm(data_points) ** 2)
 
 
-def get_dim_reduction_transformer(trans_name, r, n_features_z_matrix: int = 0, eps=1/3) -> sklearn.base.TransformerMixin:
+def get_dim_reduction_transformer(trans_name, r, n_features_z_matrix: int = 0,
+                                  eps=1 / 3) -> sklearn.base.TransformerMixin:
     """
     1. Randomized Sampling with Exact SVD (Sampl/SVD). This corresponds to Algorithm 1 with the following modification.
     In the first step of the algorithm, the matrix Z is calculated to contain exactly the
@@ -36,15 +38,15 @@ def get_dim_reduction_transformer(trans_name, r, n_features_z_matrix: int = 0, e
     """
     trans_dict = {
         "Randomized Sampling with Exact SVD":
-            sklearn.preprocessing.FunctionTransformer(rand_sampling_with_exact_svd,
+            sklearn.preprocessing.FunctionTransformer(rand_sampling_with_svd,
                                                       kw_args={"r": r,
                                                                "n_features_z_matrix": n_features_z_matrix}),
         "Randomized Sampling with Approximate SVD":
-            sklearn.preprocessing.FunctionTransformer(rand_sampling_with_exact_svd,
+            sklearn.preprocessing.FunctionTransformer(rand_sampling_with_svd,
                                                       kw_args={"r": r,
                                                                "n_features_z_matrix": n_features_z_matrix,
                                                                'approx_svd': True,
-                                                               'eps': 1/3}),
+                                                               'eps': 1 / 3}),
         "Random Projections": GaussianRandomProjection(r),
         "SVD": sklearn.decomposition.TruncatedSVD(r),
         "Approximate SVD": sklearn.preprocessing.FunctionTransformer(approximate_svd, kw_args={"k": r, "eps": eps}),
@@ -54,16 +56,16 @@ def get_dim_reduction_transformer(trans_name, r, n_features_z_matrix: int = 0, e
     return trans_dict[trans_name]
 
 
-def rand_sampling_with_exact_svd(mat: np.ndarray, n_features_z_matrix, r, approx_svd=False, eps=0):
+def rand_sampling_with_svd(mat: np.ndarray, n_features_z_matrix, r, approx_svd=False, eps=0):
     if approx_svd:
         z_mat = fast_forbenius_svd(mat, n_features_z_matrix, eps)
     else:
-        z_mat = get_right_svd_decomposion_truncated(mat, n_features_z_matrix)
+        z_mat = get_right_svd_decomposition_truncated(mat, n_features_z_matrix)
     columns_ind_sampled, scaling_factors = randomize_sampling(z_mat, r)
     return mat[:, columns_ind_sampled] * scaling_factors
 
 
-def get_right_svd_decomposion_truncated(mat: np.ndarray, k):
+def get_right_svd_decomposition_truncated(mat: np.ndarray, k):
     # TODO this function is not optimized and have redundant calculations
     u, s, vh = np.linalg.svd(mat, compute_uv=True, full_matrices=False)
     return np.transpose(vh[:k])
@@ -72,14 +74,14 @@ def get_right_svd_decomposion_truncated(mat: np.ndarray, k):
 def fast_forbenius_svd(mat: np.ndarray, k: int, eps):
     y_mat = GaussianRandomProjection(k + int(k / eps) + 1).fit_transform(mat)
     q_mat, _ = np.linalg.qr(y_mat)
-    return get_right_svd_decomposion_truncated(np.matmul(np.transpose(q_mat), mat), k)
+    return get_right_svd_decomposition_truncated(np.matmul(np.transpose(q_mat), mat), k)
 
 
 def approximate_svd(mat: np.ndarray, k: int, eps):
     return np.matmul(mat, fast_forbenius_svd(mat, k, eps))
 
 
-def randomize_sampling(mat: np.ndarray, r) -> np.ndarray:
+def randomize_sampling(mat: np.ndarray, r) -> Tuple[np.ndarray, np.ndarray]:
     # Calculation of the p_i (TODO latex)
     probabilities = np.linalg.norm(mat, axis=0) ** 2 / (np.linalg.norm(mat) ** 2)
     # Sampling columns indexes according to the p_i's
@@ -109,7 +111,7 @@ def get_data(data_name):
 
 
 def run(args):
-    ### Data producer
+    # Data producer
     ds_features, targets = get_data(args.data_set)
 
     kmeans_alg = KMeans(n_clusters=len(np.unique(targets)), n_init=5, max_iter=500)
