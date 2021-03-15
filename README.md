@@ -1,6 +1,6 @@
 # KMeansDimReduction
 
-This project is part of the course "Sketching Methods for Matrix and Data Analysis" by [Haim Evron](http://www.math.tau.ac.il/~haimav/index.html)
+This project is part of the course "Sketching Methods for Matrix and Data Analysis" by [Haim Avron](http://www.math.tau.ac.il/~haimav/index.html)
 
 The objective of the project is reproducing the results of the paper [Randomized Dimensionality Reduction
 for k-Means Clustering](https://www.boutsidis.org/Boutsidis_IEEE_IT_15.pdf)
