@@ -63,11 +63,18 @@ def rand_sampling_with_svd(mat: np.ndarray, n_features_z_matrix, r, approx_svd=F
     return mat[:, columns_ind_sampled] * scaling_factors
 
 
-def get_right_svd_decomposition_truncated(mat: np.ndarray, k):
-    # TODO this function is not optimized and have redundant calculations
-    u, s, vh = np.linalg.svd(mat, compute_uv=True, full_matrices=False)
-    return np.transpose(vh[:k])
-    # return TruncatedSVD(k).fit_transform(np.matmul(np.transpose(mat), mat))
+def get_right_svd_decomposition_truncated(mat: np.ndarray, k) -> np.ndarray:
+    """
+    Given matrix A the SVD decomposition A = U x S x transpose(V)
+    With truncated SVD the output will be the k vectors with the greatest eigenvalues
+    A_k = U_k x S_k x transpose(V_K)
+    The code is a bit tricky part and based on:
+    https://stackoverflow.com/questions/20681972/different-results-for-pca-truncated-svd-and-svds-on-numpy-and-sklearn
+    :param mat: A. the input matrix to decompose
+    :param k: the reduced dimension
+    :return: the matrix V_k from the decomposition
+    """
+    return np.transpose(TruncatedSVD(k).fit(mat).components_)
 
 
 def fast_forbenius_svd(mat: np.ndarray, k: int, eps):
@@ -82,7 +89,7 @@ def approximate_svd(mat: np.ndarray, k: int, eps):
 
 def randomize_sampling(mat: np.ndarray, r) -> Tuple[np.ndarray, np.ndarray]:
     # Calculation of the p_i (TODO latex)
-    probabilities = np.linalg.norm(mat, axis=0) ** 2 / (np.linalg.norm(mat) ** 2)
+    probabilities = np.linalg.norm(mat, axis=1) ** 2 / (np.linalg.norm(mat) ** 2)
     # Sampling columns indexes according to the p_i's
     columns_ind_sampled = np.random.choice(probabilities.size, r, p=probabilities)
     # Rescaling columns by 1/√(r * p_i)
