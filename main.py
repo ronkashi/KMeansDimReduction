@@ -79,7 +79,8 @@ def get_right_svd_decomposition_truncated(mat: np.ndarray, k) -> np.ndarray:
 
 
 def fast_forbenius_svd(mat: np.ndarray, k: int, eps):
-    y_mat = GaussianRandomProjection(k + int(k / eps) + 1).fit_transform(mat)
+    reduced_dim = min(mat.shape[1], k + int(k / eps) + 1)
+    y_mat = GaussianRandomProjection(reduced_dim).fit_transform(mat)
     q_mat, _ = np.linalg.qr(y_mat)
     return get_right_svd_decomposition_truncated(np.matmul(np.transpose(q_mat), mat), k)
 
@@ -162,6 +163,6 @@ def produce_fit(kmeans_alg, features, trans_name: str, r: int, n_features_z_matr
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-set', type=str, default='RCV1', choices=['ORL', 'SYNTH', 'USPS'])
+    parser.add_argument('--data-set', type=str, default='USPS', choices=['ORL', 'SYNTH', 'USPS'])
     parsed_args = parser.parse_args()
     run(parsed_args)
