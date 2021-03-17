@@ -10,6 +10,10 @@ from sklearn.datasets import make_blobs, fetch_olivetti_faces, fetch_openml
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.random_projection import GaussianRandomProjection
+from scipy.io import loadmat
+from os.path import join
+
+from laplacian_scores import construct_W, lap_score
 
 
 def sum_squared_norm_from_centroids(data_points, labels):
@@ -49,7 +53,7 @@ def get_dim_reduction_transformer(trans_name, r, n_features_z_matrix: int = 0, e
         "Random Projections": GaussianRandomProjection(r),
         "SVD": TruncatedSVD(r),
         "Approximate SVD": FunctionTransformer(approximate_svd, kw_args={"k": r, "eps": eps}),
-        "Laplacian Scores": None,
+        "Laplacian Scores": FunctionTransformer(laplace_score, kw_args={"r": r}),
         "K-Means": FunctionTransformer()  # identity transformer
     }
     return trans_dict[trans_name]
@@ -98,6 +102,17 @@ def randomize_sampling(mat: np.ndarray, r) -> Tuple[np.ndarray, np.ndarray]:
     return columns_ind_sampled, np.sqrt(r * probabilities[columns_ind_sampled])
 
 
+def laplace_score(mat: np.ndarray, r):
+    kwargs_w = {"metric": "euclidean", "neighbor_mode": "knn", "weight_mode": "heat_kernel", "k": 5, 't': 1}
+    weights = construct_W.construct_W(mat, **kwargs_w)
+
+    # obtain the scores of features
+    score = lap_score.lap_score(mat, W=weights)
+    # sort the feature scores in an ascending order according to the feature scores
+    idx = lap_score.feature_ranking(score)
+    return mat[:, idx[:r]]
+
+
 def get_accuracy(pred_labels, true_labels):
     num_pred_mistakes = 0
     for lbl in np.unique(pred_labels):
@@ -115,6 +130,9 @@ def get_data(data_name):
     elif data_name == 'USPS':
         data_set = fetch_openml(data_id=41082)  # https://www.openml.org/d/41082
         return np.array(data_set['data']), np.array(data_set['target'], dtype=np.uint8)
+    elif data_name in ['COIL20', 'PIE']:
+        data_set = loadmat(join('data', data_name + '.mat'))
+        return data_set['X'], data_set['Y'].ravel()
     else:
         return None
 
@@ -127,7 +145,7 @@ def run(simulation_args):
     row_list = list()
     for trans_name in ['Randomized Sampling with Exact SVD',
                        'Randomized Sampling with Approximate SVD',
-                       'Random Projections', 'SVD', 'Approximate SVD', 'K-Means']:
+                       'Random Projections', 'SVD', 'Approximate SVD', "Laplacian Scores", 'K-Means']:
         print(trans_name)
         for r in range(5, 105, 5):
             labels, running_time = produce_fit(kmeans_alg, ds_features, trans_name, r, len(np.unique(targets)))
@@ -163,6 +181,6 @@ def produce_fit(kmeans_alg, features, trans_name: str, r: int, n_features_z_matr
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-set', type=str, default='USPS', choices=['ORL', 'SYNTH', 'USPS'])
+    parser.add_argument('--data-set', type=str, default='ORL', choices=['ORL', 'SYNTH', 'USPS', 'COIL20', 'PIE'])
     parsed_args = parser.parse_args()
     run(parsed_args)
