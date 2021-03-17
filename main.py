@@ -1,11 +1,12 @@
 import argparse
 from time import perf_counter
 from typing import Tuple
+
 import numpy as np
 import pandas as pd
 from sklearn.base import TransformerMixin
 from sklearn.cluster import KMeans
-from sklearn.datasets import make_blobs, fetch_olivetti_faces
+from sklearn.datasets import make_blobs, fetch_olivetti_faces, fetch_openml
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.random_projection import GaussianRandomProjection
@@ -109,8 +110,10 @@ def get_data(data_name):
         return make_blobs(n_samples=1000, n_features=2000, centers=5, cluster_std=600,
                           center_box=(-1000, 1000), shuffle=True)
     elif data_name == 'ORL':
-        data_set = fetch_olivetti_faces(shuffle=True)
-        return data_set.data, data_set.target
+        return fetch_olivetti_faces(return_X_y=True)
+    elif data_name == 'USPS':
+        data_set = fetch_openml(data_id=41082)  # https://www.openml.org/d/41082
+        return np.array(data_set['data']), np.array(data_set['target'], dtype=np.uint8)
     else:
         return None
 
@@ -159,6 +162,6 @@ def produce_fit(kmeans_alg, features, trans_name: str, r: int, n_features_z_matr
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-set', type=str, default='ORL', choices=['ORL', 'SYNTH'])
+    parser.add_argument('--data-set', type=str, default='RCV1', choices=['ORL', 'SYNTH', 'USPS'])
     parsed_args = parser.parse_args()
     run(parsed_args)
