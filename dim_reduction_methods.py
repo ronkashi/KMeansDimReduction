@@ -76,7 +76,7 @@ def approximate_svd(mat: np.ndarray, k: int, eps):
 
 
 def randomize_sampling(mat: np.ndarray, r) -> Tuple[np.ndarray, np.ndarray]:
-    # Calculation of the p_i (TODO latex)
+    # Calculation of the p_i latex : $p_i = \frac{\norm{{X}_{(i)}}^2_2}{\norm{{X}}^2_F}$
     probabilities = np.linalg.norm(mat, axis=1) ** 2 / (np.linalg.norm(mat) ** 2)
     # Sampling columns indexes according to the p_i's
     columns_ind_sampled = np.random.choice(probabilities.size, r, p=probabilities)
