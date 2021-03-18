@@ -8,6 +8,7 @@ from scipy.io import loadmat
 from sklearn.base import TransformerMixin
 from sklearn.cluster import KMeans
 from sklearn.datasets import make_blobs, fetch_olivetti_faces, fetch_openml
+from sklearn.metrics import normalized_mutual_info_score
 
 from dim_reduction_methods import get_dim_reduction_transformer_dict
 from metrics import sum_squared_norm_from_centroids, get_accuracy
@@ -31,7 +32,7 @@ def get_data(data_name):
 
 def plot_df(data_set_name: str, df: pd.DataFrame):
     import matplotlib.pyplot as plt
-    for metric in ['Objective value', 'Accuracy', 'Running time']:
+    for metric in ['Objective value', 'Accuracy', 'Running time', 'normalized_mutual_info_score']:
         f, ax = plt.subplots()
         for key, grp in df.groupby(['dim_reduction_method']):
             grp.plot(ax=ax, y=metric, label=key)
@@ -61,15 +62,17 @@ def run(simulation_args):
         for method_name, transformer in get_dim_reduction_transformer_dict(r, num_clusters).items():
             labels, running_time = produce_fit(kmeans_alg, ds_features, transformer)
             row_list.append([method_name, r, sum_squared_norm_from_centroids(ds_features, labels),
-                             get_accuracy(labels, targets), running_time])
+                             get_accuracy(labels, targets), running_time,
+                             normalized_mutual_info_score(targets, labels)])
 
-    df = pd.DataFrame(row_list, columns=['dim_reduction_method', 'r', 'Objective value', 'Accuracy', 'Running time'])
+    df = pd.DataFrame(row_list, columns=['dim_reduction_method', 'r', 'Objective value', 'Accuracy', 'Running time',
+                                         'normalized_mutual_info_score'])
     df.set_index('r', inplace=True)
     plot_df(simulation_args.data_set, df)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data-set', type=str, default='ORL', choices=['ORL', 'SYNTH', 'USPS', 'COIL20', 'PIE'])
+    parser.add_argument('--data-set', type=str, default='ORL', choices=['SYNTH', 'USPS', 'COIL20', 'ORL', 'PIE'])
     parsed_args = parser.parse_args()
     run(parsed_args)
