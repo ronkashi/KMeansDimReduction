@@ -18,3 +18,9 @@ For configuring data set use (in the following example the synthetic data set)
 ```bash
 python3 main.py --data-set SYNTH
 ```
+
+## Graph produced
+The code runs a simulation for comparing different dimension reduction methods.
+And producing the following graphs for the specified data set (in this case [ORL](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.fetch_olivetti_faces.html) data set).
+![alt text](https://imgur.com/XhWaMcK.png) ![alt text](https://imgur.com/Iq4uvE0.png) 
+![alt text](https://imgur.com/hdB1awM.png) ![alt text](hhttps://imgur.com/G8SLBm6.png)
